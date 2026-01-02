@@ -1,3 +1,4 @@
+import AnkiExerciceView from '@/views/ankiExerciceView.vue'
 import GrammarExerciseView from '../views/GrammarExerciseView.vue'
 import HomePageView from '@/views/HomePageView.vue'
 import SelectExercisesView from '@/views/SelectExercisesView.vue'
@@ -32,6 +33,11 @@ const router = createRouter({
       path: '/translate-dev',
       name: 'translate-dev',
       component: TranslateDevWordsView
+    },
+    {
+      path: '/anki-exercise',
+      name: 'anki-exercise',
+      component: AnkiExerciceView
     }
   ]
 })

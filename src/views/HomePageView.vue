@@ -79,6 +79,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
+  
 .home-container {
   display: flex;
   flex-direction: column;
@@ -111,6 +112,7 @@ onMounted(() => {
 
 /* Level up */
 .home-container__level-up-title {
+  
   font-size: 5.5rem;
   font-weight: bold;
   margin-bottom: 2rem;
