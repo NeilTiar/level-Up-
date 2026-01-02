@@ -1,7 +1,15 @@
-<script setup></script>
+
 
 <template>
- <router-view />
+  <div id="app">
+    <router-view />
+  </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+#app {
+  font-family: Avenir, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+</style>
