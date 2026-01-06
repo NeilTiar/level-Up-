@@ -50,7 +50,7 @@
 
     <!-- Historique amélioré -->
     <div class="exercise-history">
-      <h3>Historique</h3>
+      <h3 class="history-title">Historique</h3>
       <ul>
         <li
           v-for="(item, index) in history"
@@ -368,6 +368,14 @@ onMounted(() => {
 
 <style scoped>
 
+.history-title {
+    font-family: 'Chewy', system-ui;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: #b1b6c2;
+}
+
 .correction-introduction {
     font-family: 'BBH Hegarty', cursive;
     font-size: 1.4rem;
@@ -411,7 +419,7 @@ onMounted(() => {
 
 .exercise-title {
   font-size: clamp(4.3rem, 6vw, 4rem);
-  font-family: "Edu NSW ACT Cursive", cursive;
+  font-family: "Chewy", system-ui;
   background: linear-gradient(80deg, #438eca, #f378ed);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -468,16 +476,16 @@ onMounted(() => {
 
 
 .exercise-word {
-  font-size: 5rem;
+  font-family: "Chewy", system-ui;
+  font-size: clamp(3.5rem, 5vw, 5rem);
   font-weight: bold;
   margin: 3rem 0;
   text-shadow:
-     2px 4px 0 #438eca,
-     4px 6px 0 #631463a1,
-     6px 9px 0 #481158,
-      4px 12px 0 #1c2361,
-     6px 14px 0 #099151,
-     8px 16px 0 #37579c;
+     3px 5px 0 #a7b9c7,
+     4px 6px 0 #cf7281c2,
+     6px 9px 0 #89768f,
+     6px 12px 0#aecdd4,
+     8px 16px 0 #576ca3;
 }
 
 
@@ -540,11 +548,12 @@ onMounted(() => {
   padding: 0.6rem 1rem;
   border-radius: 0.8rem;
   background-color: #2a2a2a;
-  color: #fff;
-  font-size: 1rem;
+  color: #787a85;
+  font-size: 1.3rem;
   opacity: 0;
   transform: translateY(20px);
   animation: fadeInUp 0.3s forwards;
+  font-family: "Chewy", system-ui;
 }
 
 .history-item.correct {
