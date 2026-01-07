@@ -3,7 +3,7 @@
 <div class="select-exercise-main-container">    
 
 <div class="select-title-container">
-    <h1 class="select-container__main-title">level-up</h1>
+    <h1 ref="title" class="select-container__main-title">level-up</h1>
     <h2 class="select-container__subtitle">Select Your Exercise</h2>
     
 </div>
@@ -24,8 +24,52 @@
 
 <script setup>
 
+const title = ref(null)
+
+import { ref, onMounted, onUnmounted } from 'vue'
+import { gsap } from 'gsap'
+
+
+function animateTitles() {
+  if (!title.value) return
+
+  const tl = gsap.timeline()
+
+  tl.from(title.value, {
+    opacity: 0,
+    y: -15,
+    scaleY: 1.4,
+    skewX: 10,
+    duration: 0.6,
+    ease: 'power3.out'
+  })
+
+  tl.fromTo(
+    title.value,
+    { x: -2 },
+    {
+      x: 2,
+      duration: 0.06,
+      repeat: 10,
+      yoyo: true,
+      ease: 'none'
+    },
+    '>-0.9' // démarre juste après l’apparition
+  )
+}
+
+
+onMounted(() => {
+
+  animateTitles()
+
+  setInterval(() => {
+    animateTitles()
+  }, 4500)
+})
 
 </script>
+
 
 <style scoped>
 

@@ -29,7 +29,7 @@
 
           <!-- Back -->
           <div class="card-face back" v-if="flipped">
-            <div class="corection-word" v-if="showCorrection">
+            <div class="correction-word" v-if="showCorrection">
               <p class="correction-introduction">The correct answer is:</p>
               <p class="good-answare">{{ currentExercice.correction }}</p>
             </div>
@@ -53,9 +53,11 @@
       <h3>Historique</h3>
       <ul>
         <li
-          v-for="(item, index) in history"
+          v-for="(item, index) in [...history].reverse()"
           :key="index"
-          :class="['history-item', item.correct ? 'correct' : 'wrong']"
+          :class="[
+          'history-item', item.status === 'correct' ? 'correct' : item.status === 'partial' ? 'partial' :'wrong'
+      ]"
           :style="{ animationDelay: `${index * 0.1}s` }"
         >
           <div class="history-word">{{ item.word }}</div>
@@ -63,6 +65,7 @@
             <span>{{ item.answer }}</span>
             <span class="history-icon">
               <template v-if="item.correct">✔️</template>
+              <template v-else-if="item.status === 'partial'">🟡 {{ item.correctAnswer }}</template>
               <template v-else>❌ {{ item.correctAnswer }}</template>
             </span>
           </div>
@@ -146,11 +149,18 @@ function animateCard(type) {
 
 
 // Animation de résultat (vert ou rouge)
-function flashCardResult(isCorrect) {
-  const color = isCorrect ? '#22c55e' : '#ef4444'
-  const glow = isCorrect
-    ? '0 0 35px rgba(34,197,94,0.8)'
-    : '0 0 35px rgba(239,68,68,0.8)'
+function flashCardResult(status) {
+  
+  let color = '#ef4444'  // défaut rouge
+  let glow = '0 0 35px rgba(239,68,68,0.8)'
+
+  if (status === 'correct') {
+    color = '#22c55e'
+    glow = '0 0 35px rgba(34,197,94,0.8)'
+  } else if (status === 'partial') {
+    color = '#fbbf24'      // jaune/orange pour partiel
+    glow = '0 0 35px rgba(251,191,36,0.8)'
+  }
 
   gsap.timeline()
     .to(cardRef.value, {
@@ -159,14 +169,15 @@ function flashCardResult(isCorrect) {
       duration: 0.25,
       ease: 'power2.out'
     })
-    .to({}, { duration: 0.09}) // ⏱ maintien 1,5 sec
+    .to({}, { duration: 0.09 }) // maintien
     .to(cardRef.value, {
-      backgroundColor: '#1a1a1a',
+      backgroundColor: '#191c29', // ou #1a1a1a selon ton style
       boxShadow: '0 5px 15px rgba(0,0,0,0.5)',
       duration: 0.4,
       ease: 'power2.inOut'
     })
 }
+
 
 
 // Animation des lettres du mot de façon aléatoire en boucle
@@ -259,9 +270,9 @@ function animateWordLettersRandom() {
 }
 
 
-
 // Flip avec délai pour correction
 async function flipCard(delay = 100) {
+  
   flipped.value = true
   showCorrection.value = false
   await gsap.to(cardRef.value, { rotationY: 180, duration: 0.3, ease: 'power2.inOut' })
@@ -274,24 +285,83 @@ async function flipCard(delay = 100) {
   flipped.value = false
 }
 
+
+
+// Comparaison avec l'algorithme de Levenshtein
+function compareWithLevenshtein(a, b) {
+  if (!a || !b) return 0
+
+  const matrix = Array.from({ length: b.length + 1 }, (_, i) => [i])
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1, 
+        matrix[i][j - 1] + 1, 
+        matrix[i - 1][j - 1] + (b[i - 1] === a[j - 1] ? 0 : 1)
+      )
+    }
+  }
+
+  const distance = matrix[b.length][a.length]
+  const maxLength = Math.max(a.length, b.length)
+
+  // pourcentage de similarité
+  const similarity = Math.round(((maxLength - distance) / maxLength) * 100)
+
+  return similarity
+}
+
+
+
+
 // Vérification réponse
 async function checkAnswer() {
+
   if (!userAnswer.value || finished.value) return
 
-  const correct =
-    userAnswer.value.trim().toLowerCase() === currentExercice.value.correction.toLowerCase()
+  const userResponse = userAnswer.value.trim().toLowerCase()
+  const correctWord = currentExercice.value.correction.toLowerCase()
 
-  // FEEDBACK VISUEL IMMÉDIAT
-  flashCardResult(correct)
+  let score = compareWithLevenshtein(userResponse, correctWord)
 
-  history.value.push({
-    word: currentExercice.value.word,
-    answer: userAnswer.value,
-    correct,
-    correctAnswer: correct ? null : currentExercice.value.correction
-  })
 
-  if (!correct) {
+// Définition du statut
+let status = 'wrong'
+
+// Ajustement selon la longueur pour les mots courts
+if (correctWord.length <= 5) {
+  score *= 0.9
+}
+
+// Règle de différence de longueur : pénaliser légèrement
+if (Math.abs(userResponse.length - correctWord.length) >= 2) {
+  score -= 15  // pénalité
+}
+
+// Définition du statut final
+if (score >= 85) status = 'correct'
+else if (score >= 50) status = 'partial'
+else status = 'wrong'
+
+
+
+
+  // feedback visuel (tu peux adapter la couleur)
+  flashCardResult(status)
+
+history.value.push({
+  word: currentExercice.value.word,
+  answer: userAnswer.value,
+  status,        // 'correct' | 'partial' | 'wrong'
+  correct: status === 'correct',  // true si status = correct
+  score,         // pourcentage
+  correctAnswer: status === 'correct' ? null : correctWord
+})
+
+
+  if (status == 'wrong') {
     await nextTick()
     await flipCard()
   }
@@ -310,6 +380,7 @@ async function checkAnswer() {
     finished.value = true
   }
 }
+
 
 // Recommencer
 function restartExercise() {
@@ -331,6 +402,7 @@ function goToSelection() {
 // Animation des titres
 const title = ref(null)
 const subtitle = ref(null)
+
 function animateTitles() {
   gsap.set(title.value, { opacity: 1, y: 0, scaleY: 1, scaleX: 1, skewX: 0 })
   gsap.set(subtitle.value, { opacity: 1, y: 0, rotation: 0 })
@@ -378,7 +450,7 @@ onMounted(() => {
     font-family: '"Edu NSW ACT Cursive", cursive', cursive;
 }
 
-.corection-word {
+.correction-word {
   transform: scaleX(-1);
 }
 
@@ -445,7 +517,7 @@ onMounted(() => {
 .exercise-card {
   margin-top: 1rem;
   position: relative;
-  background-color: #1a1a1a;
+  background-color: #191c29;
   border-radius: 1rem;
   padding: 2rem;
   width: 100%;
@@ -468,6 +540,8 @@ onMounted(() => {
 
 
 .exercise-word {
+  
+  font-family: "Edu NSW ACT Cursive", cursive;
   font-size: 5rem;
   font-weight: bold;
   margin: 3rem 0;
@@ -478,6 +552,8 @@ onMounted(() => {
       4px 12px 0 #1c2361,
      6px 14px 0 #099151,
      8px 16px 0 #37579c;
+ 
+
 }
 
 
@@ -551,9 +627,21 @@ onMounted(() => {
   border-left: 5px solid #4ade80;
 }
 
+.history-item.partial {
+  border-left: 5px solid #fbbf24;
+}
+
 .history-item.wrong {
   border-left: 5px solid #f87171;
 }
+
+.history-item:first-child {
+  font-size: 1.6rem;
+  font-weight: bold;
+  background-color: #2e2e2e; /* légèrement différent pour mettre en avant */
+  box-shadow: 0 5px 15px rgba(67,142,202,0.4);
+}
+
 
 .history-word {
   font-weight: bold;

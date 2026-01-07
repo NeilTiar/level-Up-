@@ -6,6 +6,7 @@ import TranslateCommonWordsView from '@/views/TranslateCommonWordsView.vue'
 import TranslateDevWordsView from '@/views/TranslateDevWordsView.vue'
 import { createRouter, createWebHistory } from 'vue-router'
 
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
