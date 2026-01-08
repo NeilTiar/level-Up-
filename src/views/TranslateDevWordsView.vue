@@ -1,4 +1,4 @@
-<template>
+<template  v-if="currentExercice" >
   <div class="exercise-container">
 
     <div class="title-container">
@@ -6,7 +6,7 @@
     <h2 ref="subtitle" class="exercise-subtitle">Translate English Dev words</h2>
     </div>
     <div class="exercise-stats">
-      <p>Questions: {{ totalQuestions }}</p>
+     <p>Question : {{ currentIndex + 1 }} / {{ totalQuestions }}</p>
       <p>Success: {{ successRate }}%</p>
     </div>
 
@@ -15,8 +15,8 @@
         <div ref="cardRef" class="exercise-card">
           <!-- Front -->
           <div class="card-face front" v-if="!flipped">
-            <span class="exercise-level">{{ currentExercice.difficulte }}</span>
-            <p class="exercise-word" ref="wordRef">{{ currentExercice.word }}</p>
+            <span class="exercise-level">{{ currentExercice?.difficulte }}</span>
+            <p v-if="currentExercice" class="exercise-word"> {{ currentExercice.word }}</p>
             <div class="exercise-input-container">
               <input
                 v-model="userAnswer"
@@ -87,7 +87,7 @@ import { exercices_tech_fr_to_en } from '@/data/techWords.js'
 gsap.registerPlugin(SplitText)
 
 // Exercices
-const exercices = exercices_tech_fr_to_en
+const exercices = ref([])
 
 const currentIndex = ref(0)
 const userAnswer = ref('')
@@ -102,14 +102,25 @@ const animations = ['fade', 'scale', 'rotate', 'slide']
 let wordSplit = null
 let wordInterval = null
 
-const currentExercice = computed(() => exercices[currentIndex.value])
-const totalQuestions = computed(() => exercices.length)
+const currentExercice = computed(() => exercices.value[currentIndex.value] ?? null)
+
+const totalQuestions = computed(() => exercices.value.length)
 const successRate = computed(() => {
   if (!history.value.length) return 0
   return Math.round(
     (history.value.filter(h => h.correct).length / history.value.length) * 100
   )
 })
+
+
+// Configuration de la répartition des difficultés ( pour alimenter la fonction pickByDifficulty )
+const config = {
+  easy: 0.33,
+  medium: 0.33,
+  hard: 0.34,
+}
+
+
 
 watch(finished, value => {
   if (value) stopWordRandomAnimation()
@@ -285,6 +296,52 @@ async function flipCard(delay = 100) {
   flipped.value = false
 }
 
+// Mélange un tableau
+function shuffle(array) {
+  const arr = [...array]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+
+
+// Mélange un tableau avec 33% de chaque difficulté 
+function pickByDifficulty(questions, total, config) {
+  const byLevel = {}
+  let quiz = []
+
+  // 1️- Grouper par niveau
+  for (const level in config) {
+    byLevel[level] = shuffle(
+      questions.filter(q => q.difficulte === level)
+    )
+  }
+
+  // 2️- Tirage initial (floor)
+  let remaining = total
+
+  for (const level in config) {
+    const count = Math.floor(total * config[level])
+    const picked = byLevel[level].splice(0, count)
+    quiz.push(...picked)
+    remaining -= picked.length
+  }
+
+  // 3️ - Compléter avec les questions restantes (tous niveaux)
+  if (remaining > 0) {
+    const leftovers = shuffle(
+      Object.values(byLevel).flat()
+    )
+    quiz.push(...leftovers.slice(0, remaining))
+  }
+
+  // 4- Shuffle final
+  return shuffle(quiz)
+}
+
 
 
 // Comparaison avec l'algorithme de Levenshtein
@@ -318,6 +375,9 @@ function compareWithLevenshtein(a, b) {
 
 // Vérification réponse
 async function checkAnswer() {
+
+  console.log("Nombre de questions :", exercices.value.length)
+console.log("currentIndex :", currentIndex.value)
 
   if (!userAnswer.value || finished.value) return
 
@@ -368,7 +428,7 @@ history.value.push({
 
   userAnswer.value = ''
 
-  if (currentIndex.value < exercices.length - 1) {
+  if (currentIndex.value < exercices.value.length - 1) {
     currentIndex.value++
     resetWordAnimation()
     animateWord()
@@ -384,15 +444,23 @@ history.value.push({
 
 // Recommencer
 function restartExercise() {
+  exercices.value = pickByDifficulty(
+    exercices_tech_fr_to_en,
+    10,
+    config
+  )
+
   currentIndex.value = 0
   history.value = []
   finished.value = false
   userAnswer.value = ''
+
   nextTick(() => {
-    animateCard(animations[currentIndex.value % animations.length])
+    animateCard(animations[0])
     animateWord()
   })
 }
+
 
 // Aller à la sélection
 function goToSelection() {
@@ -429,12 +497,23 @@ function animateTitles() {
 }
 
 onMounted(() => {
+
+     exercices.value = pickByDifficulty(
+    exercices_tech_fr_to_en,
+    10,
+    config
+  )
+
+  console.log("Nombre de questions générées :", exercices.value.length)
+console.log(exercices.value)
+
   animateTitles()
   animateWordLettersRandom()
   startWordRandomAnimation()
   setInterval(animateTitles, 6500)
   animateCard(animations[currentIndex.value % animations.length])
   animateWord()
+
 })
 </script>
 
@@ -539,22 +618,23 @@ onMounted(() => {
 }
 
 
+
 .exercise-word {
-  
   font-family: "Edu NSW ACT Cursive", cursive;
-  font-size: 5rem;
   font-weight: bold;
   margin: 3rem 0;
-  text-shadow:
+      text-shadow:
      2px 4px 0 #438eca,
      4px 6px 0 #631463a1,
      6px 9px 0 #481158,
       4px 12px 0 #1c2361,
      6px 14px 0 #099151,
      8px 16px 0 #37579c;
- 
 
+  font-size: clamp(2rem, 8vw, 5rem); /* min 2rem, max 5rem, s’adapte selon la largeur */
+  word-break: break-word;             /* casse les mots longs */
 }
+
 
 
 .exercise-input-container {
