@@ -50,7 +50,7 @@
 
     <!-- Historique amélioré -->
     <div class="exercise-history">
-      <h3>Historique</h3>
+      <h3 class="history-title">Historique</h3>
       <ul>
         <li
           v-for="(item, index) in [...history].reverse()"
@@ -60,11 +60,11 @@
       ]"
           :style="{ animationDelay: `${index * 0.1}s` }"
         >
-          <div class="history-word">{{ item.word }}</div>
+          <div class="history-word">{{ item.word }} &nbsp;&nbsp; </div>
           <div class="history-answer">
-            <span>{{ item.answer }}</span>
+            <span> &nbsp;{{ item.answer }}</span>
             <span class="history-icon">
-              <template v-if="item.correct">✔️</template>
+              <template v-if="item.correct"></template>
               <template v-else-if="item.status === 'partial'">🟡 {{ item.correctAnswer }}</template>
               <template v-else>❌ {{ item.correctAnswer }}</template>
             </span>
@@ -376,8 +376,6 @@ function compareWithLevenshtein(a, b) {
 // Vérification réponse
 async function checkAnswer() {
 
-  console.log("Nombre de questions :", exercices.value.length)
-console.log("currentIndex :", currentIndex.value)
 
   if (!userAnswer.value || finished.value) return
 
@@ -401,7 +399,7 @@ if (Math.abs(userResponse.length - correctWord.length) >= 2) {
 }
 
 // Définition du statut final
-if (score >= 85) status = 'correct'
+if (userResponse === correctWord) status = 'correct'
 else if (score >= 50) status = 'partial'
 else status = 'wrong'
 
@@ -535,7 +533,7 @@ console.log(exercices.value)
 
 .good-answare {
   font-family: 'BBH Hegarty', cursive;
-  font-size: 2.4rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
   font-weight: lighter;
   text-align: center;
   width: max-content;
@@ -558,6 +556,7 @@ console.log(exercices.value)
   color: #fff;
   gap: 2rem;
   position: relative;
+  
 }
 
 .exercise-title {
@@ -570,16 +569,21 @@ console.log(exercices.value)
 }
 
 .exercise-subtitle {
+  font-family: "Edu NSW ACT Cursive", cursive;
   font-size: 1.2rem;
   color: #ffffff;
   text-align: center;
   margin-bottom: 4rem;
+   text-shadow:
+     2px 3px 0 #a0a0a0,
+     2px 6px 0 #3f4b5f;
+    
 }
 
 .exercise-stats {
   display: flex;
-  justify-content: space-between;
-  width: 100%;
+  justify-content:space-around;
+  width: 90%;
   max-width: 400px;
   font-weight: bold;
   color: #c2c9c8;
@@ -587,9 +591,10 @@ console.log(exercices.value)
 }
 
 .exercise-card-container {
-  width: 100%;
+  width: 80vw;
   display: flex;
   justify-content: center;
+  
   
 }
 
@@ -598,7 +603,7 @@ console.log(exercices.value)
   position: relative;
   background-color: #191c29;
   border-radius: 1rem;
-  padding: 2rem;
+  padding: 1.5rem;
   width: 100%;
   max-width: 400px;
   text-align: center;
@@ -620,17 +625,13 @@ console.log(exercices.value)
 
 
 .exercise-word {
-  font-family: "Edu NSW ACT Cursive", cursive;
+  font-family: "arial black", sans-serif;
   font-weight: bold;
   margin: 3rem 0;
-      text-shadow:
-     2px 4px 0 #438eca,
-     4px 6px 0 #631463a1,
-     6px 9px 0 #481158,
-      4px 12px 0 #1c2361,
-     6px 14px 0 #099151,
-     8px 16px 0 #37579c;
-
+  text-shadow:
+     2px 5px 0 #5d4964,
+     4px 6px 0 #631463a1;
+   
   font-size: clamp(2rem, 8vw, 5rem); /* min 2rem, max 5rem, s’adapte selon la largeur */
   word-break: break-word;             /* casse les mots longs */
 }
@@ -669,9 +670,13 @@ console.log(exercices.value)
 
 /* Historique amélioré */
 .exercise-history {
-  width: 100%;
+  display:flex;
+  flex-direction: column;
+  align-items: center;
+  
   max-width: 450px;
   margin-top: 2rem;
+
 }
 
 .exercise-history h3 {
@@ -697,10 +702,12 @@ console.log(exercices.value)
   border-radius: 0.8rem;
   background-color: #2a2a2a;
   color: #fff;
-  font-size: 1rem;
+  font-size: 1.1rem;
   opacity: 0;
   transform: translateY(20px);
   animation: fadeInUp 0.3s forwards;
+  width: 100%;
+  
 }
 
 .history-item.correct {
@@ -716,7 +723,7 @@ console.log(exercices.value)
 }
 
 .history-item:first-child {
-  font-size: 1.6rem;
+  font-size: clamp(1rem, 2vw, 2rem);
   font-weight: bold;
   background-color: #2e2e2e; /* légèrement différent pour mettre en avant */
   box-shadow: 0 5px 15px rgba(67,142,202,0.4);
@@ -724,6 +731,7 @@ console.log(exercices.value)
 
 
 .history-word {
+  font-size: 0.9rem;
   font-weight: bold;
   flex: 1;
 }
@@ -786,5 +794,16 @@ console.log(exercices.value)
 
 .char {
   display: inline-block;
+}
+
+.history-title {
+  font-family: "Edu NSW ACT Cursive", cursive;
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(80deg, #8598a8, #ffe1fe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
 }
 </style>
