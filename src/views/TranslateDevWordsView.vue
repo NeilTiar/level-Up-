@@ -7,8 +7,10 @@
     </div>
     <div class="exercise-stats">
      <p>Question : {{ currentIndex + 1 }} / {{ totalQuestions }}</p>
-      <p>Success: {{ successRate }}%</p>
+      <p>Session success: {{ successRate }}%</p>
     </div>
+
+     <p>Latest word precision {{ currentWordScore }} %</p>
 
     <div class="exercise-card-container">
       <template v-if="!finished">
@@ -62,7 +64,7 @@
         >
           <div class="history-word">{{ item.word }} &nbsp;&nbsp; </div>
           <div class="history-answer">
-            <span> &nbsp;{{ item.answer }}</span>
+            <span class> &nbsp;{{ item.answer }}</span>
             <span class="history-icon">
               <template v-if="item.correct"></template>
               <template v-else-if="item.status === 'partial'">🟡 {{ item.correctAnswer }}</template>
@@ -88,7 +90,7 @@ gsap.registerPlugin(SplitText)
 
 // Exercices
 const exercices = ref([])
-
+const currentWordScore = ref(0)
 const currentIndex = ref(0)
 const userAnswer = ref('')
 const history = ref([])
@@ -107,10 +109,16 @@ const currentExercice = computed(() => exercices.value[currentIndex.value] ?? nu
 const totalQuestions = computed(() => exercices.value.length)
 const successRate = computed(() => {
   if (!history.value.length) return 0
-  return Math.round(
-    (history.value.filter(h => h.correct).length / history.value.length) * 100
-  )
+
+  const total = history.value.reduce((sum, h) => {
+    if (h.status === 'correct') return sum + 1
+    if (h.status === 'partial') return sum + 0.5
+    return sum
+  }, 0)
+
+  return Math.round((total / history.value.length) * 100)
 })
+
 
 
 // Configuration de la répartition des difficultés ( pour alimenter la fonction pickByDifficulty )
@@ -346,16 +354,19 @@ function pickByDifficulty(questions, total, config) {
 
 // Comparaison avec l'algorithme de Levenshtein
 function compareWithLevenshtein(a, b) {
+  if (a === b) return 100
   if (!a || !b) return 0
 
-  const matrix = Array.from({ length: b.length + 1 }, (_, i) => [i])
+  const matrix = Array.from({ length: b.length + 1 }, () => [])
+
+  for (let i = 0; i <= b.length; i++) matrix[i][0] = i
   for (let j = 0; j <= a.length; j++) matrix[0][j] = j
 
   for (let i = 1; i <= b.length; i++) {
     for (let j = 1; j <= a.length; j++) {
       matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1, 
-        matrix[i][j - 1] + 1, 
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
         matrix[i - 1][j - 1] + (b[i - 1] === a[j - 1] ? 0 : 1)
       )
     }
@@ -364,10 +375,41 @@ function compareWithLevenshtein(a, b) {
   const distance = matrix[b.length][a.length]
   const maxLength = Math.max(a.length, b.length)
 
-  // pourcentage de similarité
-  const similarity = Math.round(((maxLength - distance) / maxLength) * 100)
+  return Math.round(((maxLength - distance) / maxLength) * 100)
+}
 
-  return similarity
+/**
+ * Détermine le statut d'une réponse à partir du score Levenshtein
+ * et prend en compte les mots corrects mais mal ordonnés.
+ *
+ * @param {number} score - Score de similarité (0–100)
+ * @param {string} correctWord - Mot de référence
+ * @param {string} userResponse - Réponse de l'utilisateur
+ * @returns {'correct' | 'partial' | 'wrong'}
+ */
+function getStatus(score, correctWord, userResponse = '') {
+  if (!correctWord) return 'wrong'
+
+  const correct = correctWord.trim().toLowerCase()
+  const userResp = (userResponse || '').trim().toLowerCase()
+  const length = correct.length
+
+  if (score === 100) return 'correct'
+
+  // Vérifie tous les mots présents (ordre différent accepté)
+  const correctWords = correct.split(' ').filter(Boolean)
+  const userWords = userResp.split(' ').filter(Boolean)
+
+  const wordsMatch =
+    correctWords.every(w => userWords.includes(w)) &&
+    correctWords.length === userWords.length
+
+  if (wordsMatch) return 'partial'
+
+  // Seuils selon longueur
+  if (length <= 4) return score >= 85 ? 'partial' : 'wrong'
+  if (length <= 7) return score >= 70 ? 'partial' : 'wrong'
+  return score >= 60 ? 'partial' : 'wrong'
 }
 
 
@@ -375,69 +417,59 @@ function compareWithLevenshtein(a, b) {
 
 // Vérification réponse
 async function checkAnswer() {
-
-
   if (!userAnswer.value || finished.value) return
 
   const userResponse = userAnswer.value.trim().toLowerCase()
-  const correctWord = currentExercice.value.correction.toLowerCase()
+  const correctWord = currentExercice.value.correction.trim().toLowerCase()
 
-  let score = compareWithLevenshtein(userResponse, correctWord)
+  // 1️- Score pur (0–100)
+  const score = Math.max(
+  0,
+  Math.min(100, compareWithLevenshtein(userResponse, correctWord))
+)
 
+// reset explicite si tu veux
+currentWordScore.value = null
+currentWordScore.value = score
 
-// Définition du statut
-let status = 'wrong'
+  // 2️- Statut dérivé du score
+  const status = getStatus(score, correctWord)
 
-// Ajustement selon la longueur pour les mots courts
-if (correctWord.length <= 5) {
-  score *= 0.9
-}
-
-// Règle de différence de longueur : pénaliser légèrement
-if (Math.abs(userResponse.length - correctWord.length) >= 2) {
-  score -= 15  // pénalité
-}
-
-// Définition du statut final
-if (userResponse === correctWord) status = 'correct'
-else if (score >= 50) status = 'partial'
-else status = 'wrong'
-
-
-
-
-  // feedback visuel (tu peux adapter la couleur)
+  // 3️- Feedback visuel
   flashCardResult(status)
 
-history.value.push({
-  word: currentExercice.value.word,
-  answer: userAnswer.value,
-  status,        // 'correct' | 'partial' | 'wrong'
-  correct: status === 'correct',  // true si status = correct
-  score,         // pourcentage
-  correctAnswer: status === 'correct' ? null : correctWord
-})
+  // 4️- Historique (score = source de vérité)
+  history.value.push({
+    word: currentExercice.value.word,
+    answer: userAnswer.value,
+    score,                 // 0–100
+    status,                // 'correct' | 'partial' | 'wrong'
+    correct: status === 'correct',
+    correctAnswer: status === 'correct' ? null : correctWord
+  })
 
-
-  if (status == 'wrong') {
+  // 5️- Affichage correction si faux
+  if (status === 'wrong') {
     await nextTick()
     await flipCard()
   }
 
+  // 6️- Reset input
   userAnswer.value = ''
 
+  // 7️- Question suivante ou fin
   if (currentIndex.value < exercices.value.length - 1) {
     currentIndex.value++
     resetWordAnimation()
-    animateWord()
-    animateWordLettersRandom()
     await nextTick()
     animateCard(animations[Math.floor(Math.random() * animations.length)])
     animateWord()
+    animateWordLettersRandom()
   } else {
     finished.value = true
   }
 }
+
 
 
 // Recommencer
@@ -632,7 +664,7 @@ console.log(exercices.value)
      2px 5px 0 #5d4964,
      4px 6px 0 #631463a1;
    
-  font-size: clamp(2rem, 8vw, 5rem); /* min 2rem, max 5rem, s’adapte selon la largeur */
+  font-size: clamp(1.8rem, 2vw, 5rem); /* min 2rem, max 5rem, s’adapte selon la largeur */
   word-break: break-word;             /* casse les mots longs */
 }
 
@@ -706,24 +738,24 @@ console.log(exercices.value)
   opacity: 0;
   transform: translateY(20px);
   animation: fadeInUp 0.3s forwards;
-  width: 100%;
+  width: 95%;
   
 }
 
 .history-item.correct {
-  border-left: 5px solid #4ade80;
+  border-left: 5px solid #9edbad;
 }
 
 .history-item.partial {
-  border-left: 5px solid #fbbf24;
+  border-left: 5px solid #8669a1;
 }
 
 .history-item.wrong {
-  border-left: 5px solid #f87171;
+  border-left: 5px solid #e66873;
 }
 
 .history-item:first-child {
-  font-size: clamp(1rem, 2vw, 2rem);
+  font-size: clamp(1.8rem, 2vw, 2.2rem);
   font-weight: bold;
   background-color: #2e2e2e; /* légèrement différent pour mettre en avant */
   box-shadow: 0 5px 15px rgba(67,142,202,0.4);
@@ -805,5 +837,9 @@ console.log(exercices.value)
   -webkit-text-fill-color: transparent;
   background-clip: text;
   text-fill-color: transparent;
+}
+
+.history-answer-texte{
+  text-align: center;
 }
 </style>
