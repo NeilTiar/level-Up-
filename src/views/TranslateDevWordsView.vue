@@ -3,7 +3,7 @@
 
     <div class="title-container">
     <h1 ref="title" class="exercise-title">Level up</h1>
-    <h2 ref="subtitle" class="exercise-subtitle">Translate English Dev words</h2>
+    <h2 ref="subtitle" class="exercise-subtitle">Reverse translation of development   terms </h2>
     </div>
     <div class="exercise-stats">
      <p>Question : {{ currentIndex + 1 }} / {{ totalQuestions }}</p>
@@ -602,7 +602,7 @@ console.log(exercices.value)
 
 .exercise-subtitle {
   font-family: "Edu NSW ACT Cursive", cursive;
-  font-size: 1.2rem;
+  font-size: 1rem;
   color: #ffffff;
   text-align: center;
   margin-bottom: 4rem;
@@ -747,7 +747,7 @@ console.log(exercices.value)
 }
 
 .history-item.partial {
-  border-left: 5px solid #8669a1;
+  border-left: 5px solid #ac9532;
 }
 
 .history-item.wrong {
