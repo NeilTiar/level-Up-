@@ -6,6 +6,7 @@
     <h2 ref="subtitle" class="exercise-subtitle">Translate Common English words</h2>
     </div>
     <div class="exercise-stats">
+      <p>Latest word precision {{ currentWordScore }} %</p>
       <p>Questions: {{ totalQuestions }}</p>
       <p>Success: {{ successRate }}%</p>
     </div>
@@ -55,7 +56,9 @@
         <li
           v-for="(item, index) in history"
           :key="index"
-          :class="['history-item', item.correct ? 'correct' : 'wrong']"
+          :class="[
+          'history-item', item.status === 'correct' ? 'correct' : item.status === 'partial' ? 'partial' :'wrong'
+]"
           :style="{ animationDelay: `${index * 0.1}s` }"
         >
           <div class="history-word">{{ item.word }}</div>
@@ -63,6 +66,7 @@
             <span>{{ item.answer }}</span>
             <span class="history-icon">
               <template v-if="item.correct">✔️</template>
+              <template v-else-if="item.status === 'partial'"> {{ item.correctAnswer }}</template>
               <template v-else>❌ {{ item.correctAnswer }}</template>
             </span>
           </div>
@@ -79,6 +83,8 @@ import SplitText from 'gsap/SplitText'
 import router from '@/router'
 import { watch } from 'vue'
 import { exercices_common_english } from '@/data/commonWords.js'
+import { pickByDifficulty , compareWithLevenshtein , getStatus, shuffle } from '../utils/ReverseTranslateExerciseEngine.js'
+import { useNextQuestion,  evaluateAnswer } from '../utils/ReverseTranslateExerciseEngine.js'
 
 
 gsap.registerPlugin(SplitText)
@@ -92,7 +98,7 @@ const history = ref([])
 const finished = ref(false)
 const flipped = ref(false)
 const showCorrection = ref(false)
-
+const currentWordScore = ref(0)
 const cardRef = ref(null)
 const wordRef = ref(null)
 const animations = ['fade', 'scale', 'rotate', 'slide']
@@ -146,12 +152,17 @@ function animateCard(type) {
 
 
 // Animation de résultat (vert ou rouge)
-function flashCardResult(isCorrect) {
-  const color = isCorrect ? '#22c55e' : '#ef4444'
-  const glow = isCorrect
-    ? '0 0 35px rgba(34,197,94,0.8)'
-    : '0 0 35px rgba(239,68,68,0.8)'
+function flashCardResult(status) {
+  let color = '#ef4444'  // défaut rouge
+  let glow = '0 0 35px rgba(239,68,68,0.8)'
 
+  if (status === 'correct') {
+    color = '#22c55e'
+    glow = '0 0 35px rgba(34,197,94,0.8)'
+  } else if (status === 'partial') {
+    color = '#fbbf24'      // jaune/orange pour partiel
+    glow = '0 0 35px rgba(251,191,36,0.8)'
+  }
   gsap.timeline()
     .to(cardRef.value, {
       backgroundColor: color,
@@ -274,42 +285,44 @@ async function flipCard(delay = 100) {
   flipped.value = false
 }
 
+
+
+
 // Vérification réponse
 async function checkAnswer() {
+  
   if (!userAnswer.value || finished.value) return
 
-  const correct =
-    userAnswer.value.trim().toLowerCase() === currentExercice.value.correction.toLowerCase()
+  const { score, status } = evaluateAnswer({
+    userResponse: userAnswer.value.trim().toLowerCase(),
+    correctWord: currentExercice.value.correction.trim().toLowerCase()
+  })
 
-  // FEEDBACK VISUEL IMMÉDIAT
-  flashCardResult(correct)
+  console.log('Score:', score, 'Status:', status)
+
+  currentWordScore.value = score
+  flashCardResult(status)
 
   history.value.push({
     word: currentExercice.value.word,
     answer: userAnswer.value,
-    correct,
-    correctAnswer: correct ? null : currentExercice.value.correction
+    score,
+    status,
+    correct: status === 'correct',
+    correctAnswer: status === 'correct'
+      ? null
+      : currentExercice.value.correction
   })
 
-  if (!correct) {
+  if (status === 'wrong') {
     await nextTick()
     await flipCard()
   }
 
   userAnswer.value = ''
-
-  if (currentIndex.value < exercices.length - 1) {
-    currentIndex.value++
-    resetWordAnimation()
-    animateWord()
-    animateWordLettersRandom()
-    await nextTick()
-    animateCard(animations[Math.floor(Math.random() * animations.length)])
-    animateWord()
-  } else {
-    finished.value = true
-  }
+  useNextQuestion()
 }
+
 
 // Recommencer
 function restartExercise() {
@@ -557,11 +570,15 @@ onMounted(() => {
 }
 
 .history-item.correct {
-  border-left: 5px solid #4ade80;
+  border-left: 25px solid #4ade80;
 }
 
 .history-item.wrong {
-  border-left: 5px solid #f87171;
+  border-left: 25px solid #f87171;
+}
+
+.history-item.partial {
+  border-left: 25px solid #fbbf24;
 }
 
 .history-word {

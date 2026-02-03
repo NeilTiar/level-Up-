@@ -1,9 +1,11 @@
+<!-- This style section is the most successful and should be implemented across all exercises. -->
 <template  v-if="currentExercice" >
   <div class="exercise-container">
 
     <div class="title-container">
     <h1 ref="title" class="exercise-title">Level up</h1>
-    <h2 ref="subtitle" class="exercise-subtitle">Reverse translation of development   terms </h2>
+    <h2 ref="subtitle" class="exercise-subtitle">Translate French Words Into English</h2>
+    <h3 ref="subtitle" class="theme-exercise"> Tech & dev vocabulary <img class="tech-dev-icon" src="../asset/tech-dev-icon.png" alt="Tech Icon"></h3>
     </div>
     <div class="exercise-stats">
      <p>Question : {{ currentIndex + 1 }} / {{ totalQuestions }}</p>
@@ -21,9 +23,10 @@
             <p v-if="currentExercice" class="exercise-word"> {{ currentExercice.word }}</p>
             <div class="exercise-input-container">
               <input
+                id="user-answer"
                 v-model="userAnswer"
                 @keyup.enter="checkAnswer"
-                placeholder="Entrez votre traduction"
+                placeholder="Entrez votre reponse"
               />
               <button class="validation-button" @click="checkAnswer">Valider</button>
             </div>
@@ -40,11 +43,11 @@
       </template>
 
       <template v-else>
-        <div class="finished-message">
-          <h2>Exercice terminé ! 🎉</h2>
+        <div class="finished-message-container">
+          <h2 class="finished-message">Exercice terminé ! 🎉</h2>
           <div class="finished-buttons">
-            <button @click="restartExercise">Recommencer</button>
-            <button @click="goToSelection">Choix des exercices</button>
+            <button class="restart-button" @click="restartExercise">Recommencer</button>
+            <button class="redirect-menu-button" @click="goToSelection">Choix des exercices</button>
           </div>
         </div>
       </template>
@@ -67,8 +70,8 @@
             <span class> &nbsp;{{ item.answer }}</span>
             <span class="history-icon">
               <template v-if="item.correct"></template>
-              <template v-else-if="item.status === 'partial'">🟡 {{ item.correctAnswer }}</template>
-              <template v-else>❌ {{ item.correctAnswer }}</template>
+              <template v-else-if="item.status === 'partial'"> {{ item.correctAnswer }}</template>
+              <template v-else> {{ item.correctAnswer }}</template>
             </span>
           </div>
         </li>
@@ -82,8 +85,14 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import gsap from 'gsap'
 import SplitText from 'gsap/SplitText'
 import router from '@/router'
-import { watch } from 'vue'
+import { watch } from 'vue' 
 import { exercices_tech_fr_to_en } from '@/data/techWords.js'
+import { pickByDifficulty , compareWithLevenshtein , getStatus, shuffle } from '../utils/ReverseTranslateExerciseEngine.js'
+import { useNextQuestion,  evaluateAnswer } from '../utils/ReverseTranslateExerciseEngine.js'
+
+
+
+
 
 
 gsap.registerPlugin(SplitText)
@@ -105,7 +114,7 @@ let wordSplit = null
 let wordInterval = null
 
 const currentExercice = computed(() => exercices.value[currentIndex.value] ?? null)
-
+const { nextQuestion } = useNextQuestion(currentIndex, finished, exercices)
 const totalQuestions = computed(() => exercices.value.length)
 const successRate = computed(() => {
   if (!history.value.length) return 0
@@ -199,6 +208,8 @@ function flashCardResult(status) {
 
 
 
+
+
 // Animation des lettres du mot de façon aléatoire en boucle
 function startWordRandomAnimation() {
   stopWordRandomAnimation()
@@ -225,6 +236,9 @@ function resetWordAnimation() {
 
 // Animation du mot avec alternance
 function animateWord() {
+
+  
+
   const anim = animations[Math.floor(Math.random() * animations.length)]
   switch (anim) {
     case 'fade':
@@ -304,171 +318,42 @@ async function flipCard(delay = 100) {
   flipped.value = false
 }
 
-// Mélange un tableau
-function shuffle(array) {
-  const arr = [...array]
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[arr[i], arr[j]] = [arr[j], arr[i]]
-  }
-  return arr
-}
-
-
-
-// Mélange un tableau avec 33% de chaque difficulté 
-function pickByDifficulty(questions, total, config) {
-  const byLevel = {}
-  let quiz = []
-
-  // 1️- Grouper par niveau
-  for (const level in config) {
-    byLevel[level] = shuffle(
-      questions.filter(q => q.difficulte === level)
-    )
-  }
-
-  // 2️- Tirage initial (floor)
-  let remaining = total
-
-  for (const level in config) {
-    const count = Math.floor(total * config[level])
-    const picked = byLevel[level].splice(0, count)
-    quiz.push(...picked)
-    remaining -= picked.length
-  }
-
-  // 3️ - Compléter avec les questions restantes (tous niveaux)
-  if (remaining > 0) {
-    const leftovers = shuffle(
-      Object.values(byLevel).flat()
-    )
-    quiz.push(...leftovers.slice(0, remaining))
-  }
-
-  // 4- Shuffle final
-  return shuffle(quiz)
-}
-
-
-
-// Comparaison avec l'algorithme de Levenshtein
-function compareWithLevenshtein(a, b) {
-  if (a === b) return 100
-  if (!a || !b) return 0
-
-  const matrix = Array.from({ length: b.length + 1 }, () => [])
-
-  for (let i = 0; i <= b.length; i++) matrix[i][0] = i
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j
-
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + (b[i - 1] === a[j - 1] ? 0 : 1)
-      )
-    }
-  }
-
-  const distance = matrix[b.length][a.length]
-  const maxLength = Math.max(a.length, b.length)
-
-  return Math.round(((maxLength - distance) / maxLength) * 100)
-}
-
-/**
- * Détermine le statut d'une réponse à partir du score Levenshtein
- * et prend en compte les mots corrects mais mal ordonnés.
- *
- * @param {number} score - Score de similarité (0–100)
- * @param {string} correctWord - Mot de référence
- * @param {string} userResponse - Réponse de l'utilisateur
- * @returns {'correct' | 'partial' | 'wrong'}
- */
-function getStatus(score, correctWord, userResponse = '') {
-  if (!correctWord) return 'wrong'
-
-  const correct = correctWord.trim().toLowerCase()
-  const userResp = (userResponse || '').trim().toLowerCase()
-  const length = correct.length
-
-  if (score === 100) return 'correct'
-
-  // Vérifie tous les mots présents (ordre différent accepté)
-  const correctWords = correct.split(' ').filter(Boolean)
-  const userWords = userResp.split(' ').filter(Boolean)
-
-  const wordsMatch =
-    correctWords.every(w => userWords.includes(w)) &&
-    correctWords.length === userWords.length
-
-  if (wordsMatch) return 'partial'
-
-  // Seuils selon longueur
-  if (length <= 4) return score >= 85 ? 'partial' : 'wrong'
-  if (length <= 7) return score >= 70 ? 'partial' : 'wrong'
-  return score >= 60 ? 'partial' : 'wrong'
-}
-
 
 
 
 // Vérification réponse
 async function checkAnswer() {
+  
   if (!userAnswer.value || finished.value) return
 
-  const userResponse = userAnswer.value.trim().toLowerCase()
-  const correctWord = currentExercice.value.correction.trim().toLowerCase()
+  const { score, status } = evaluateAnswer({
+    userResponse: userAnswer.value.trim().toLowerCase(),
+    correctWord: currentExercice.value.correction.trim().toLowerCase()
+  })
 
-  // 1️- Score pur (0–100)
-  const score = Math.max(
-  0,
-  Math.min(100, compareWithLevenshtein(userResponse, correctWord))
-)
-
-// reset explicite si tu veux
-currentWordScore.value = null
-currentWordScore.value = score
-
-  // 2️- Statut dérivé du score
-  const status = getStatus(score, correctWord)
-
-  // 3️- Feedback visuel
+  currentWordScore.value = score
   flashCardResult(status)
 
-  // 4️- Historique (score = source de vérité)
   history.value.push({
     word: currentExercice.value.word,
     answer: userAnswer.value,
-    score,                 // 0–100
-    status,                // 'correct' | 'partial' | 'wrong'
+    score,
+    status,
     correct: status === 'correct',
-    correctAnswer: status === 'correct' ? null : correctWord
+    correctAnswer: status === 'correct'
+      ? null
+      : currentExercice.value.correction
   })
 
-  // 5️- Affichage correction si faux
   if (status === 'wrong') {
     await nextTick()
     await flipCard()
   }
 
-  // 6️- Reset input
   userAnswer.value = ''
-
-  // 7️- Question suivante ou fin
-  if (currentIndex.value < exercices.value.length - 1) {
-    currentIndex.value++
-    resetWordAnimation()
-    await nextTick()
-    animateCard(animations[Math.floor(Math.random() * animations.length)])
-    animateWord()
-    animateWordLettersRandom()
-  } else {
-    finished.value = true
-  }
+  nextQuestion()
 }
+
 
 
 
@@ -527,6 +412,7 @@ function animateTitles() {
 }
 
 onMounted(() => {
+  
 
      exercices.value = pickByDifficulty(
     exercices_tech_fr_to_en,
@@ -591,13 +477,25 @@ console.log(exercices.value)
   
 }
 
+
+.tech-dev-icon {
+  width: 60px;
+  height: 60px;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+}
+
 .exercise-title {
+  margin-bottom: 0.3rem;
   font-size: clamp(4.3rem, 6vw, 4rem);
   font-family: "Edu NSW ACT Cursive", cursive;
   background: linear-gradient(80deg, #438eca, #f378ed);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-align: center;
+  text-shadow:
+    -8px -3px 0 #d9d9e2,
+     -4px 4.5px 0 #bdb1c7;
 }
 
 .exercise-subtitle {
@@ -605,21 +503,22 @@ console.log(exercices.value)
   font-size: 1rem;
   color: #ffffff;
   text-align: center;
-  margin-bottom: 4rem;
+  margin-bottom: 0.5rem;
    text-shadow:
-     2px 3px 0 #a0a0a0,
-     2px 6px 0 #3f4b5f;
+     2px 3px 0 #36113b,
+     -1.5px 4.5px 0 #bd9ddba2;
     
 }
 
 .exercise-stats {
   display: flex;
   justify-content:space-around;
-  width: 90%;
+  width: 98%;
+  font-size: 0.8rem;
   max-width: 400px;
   font-weight: bold;
   color: #c2c9c8;
-  padding:0 1rem;
+  
 }
 
 .exercise-card-container {
@@ -628,6 +527,18 @@ console.log(exercices.value)
   justify-content: center;
   
   
+}
+
+.finished-message {
+  margin: 1rem 0;
+  position: relative;
+  background-color: #191c29;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
 }
 
 .exercise-card {
@@ -654,6 +565,20 @@ console.log(exercices.value)
   font-weight: bold;
 }
 
+.theme-exercise {
+
+  margin-bottom: 4rem;
+  font-family: "Edu NSW ACT Cursive", cursive;
+  font-size: 0.9rem;
+  color: #ffffff;
+  text-align: left;
+  margin-bottom: 2rem;
+   text-shadow:
+     2px 3px 0 #36113b,
+     -1.5px 4.5px 0 #bd9ddba2;
+    
+}
+
 
 
 .exercise-word {
@@ -668,6 +593,13 @@ console.log(exercices.value)
   word-break: break-word;             /* casse les mots longs */
 }
 
+.redirect-menu-button {
+  background: linear-gradient(80deg, #2a5274, #8d45898f);
+}
+
+.restart-button {
+  background: linear-gradient(80deg, #1b4e52, #454680);
+}
 
 
 .exercise-input-container {
@@ -738,20 +670,20 @@ console.log(exercices.value)
   opacity: 0;
   transform: translateY(20px);
   animation: fadeInUp 0.3s forwards;
-  width: 95%;
+  min-width: 85%;
   
 }
 
 .history-item.correct {
-  border-left: 5px solid #9edbad;
+  border-left: 20px solid #4dd892;
 }
 
 .history-item.partial {
-  border-left: 5px solid #ac9532;
+  border-left: 20px solid #dd993f;
 }
 
 .history-item.wrong {
-  border-left: 5px solid #e66873;
+  border-left: 20px solid #e66883;
 }
 
 .history-item:first-child {
@@ -813,7 +745,7 @@ console.log(exercices.value)
   padding: 0.5rem 1.2rem;
   border-radius: 1rem;
   border: none;
-  background-color: #438eca;
+  background-color: #1c4f58;
   color: #fff;
   font-weight: bold;
   cursor: pointer;
