@@ -1,23 +1,52 @@
 
 // utils/answerEngine.js
+export function evaluateAnswer({ userResponse, correctWord, synonyms = [] }) {
+  const candidates = [correctWord, ...(synonyms.map(s => s.toLowerCase()))];
+  let bestScore = 0;
+  let bestMatch = correctWord; // par défaut
 
+  candidates.forEach(candidate => {
+    const score = levenshteinPercentage(userResponse, candidate);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = candidate; // on mémorise le mot le plus proche
+    }
+  });
 
+  let status = 'wrong';
+  if (bestScore === 100) status = 'correct';
+  else if (bestScore >= 70) status = 'partial'; // seuil ajustable
 
-
-export function evaluateAnswer({ userResponse, correctWord}) {
-
-  // cette variable etablie un clamped score entre 0 et 100 en utilisant la fonction compareWithLevenshtein
-  const score = Math.max( 0, Math.min(100, compareWithLevenshtein(userResponse, correctWord))
-  )
-
-  const status = getStatus(score, correctWord, userResponse)
-
-  return {
-    score,
-    status,
-    correct: status === 'correct'
-  }
+  return { score: bestScore, status, bestMatch };
 }
+
+
+
+// transforme la distance Levenshtein en pourcentage de similitude
+function levenshteinPercentage(a, b) {
+
+  if (!a && !b) return 100;
+  if (!a || !b) return 0;
+
+  const matrix = Array.from({ length: b.length + 1 }, () => []);
+  for (let i = 0; i <= b.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + (b[i - 1] === a[j - 1] ? 0 : 1)
+      );
+    }
+  }
+
+  const distance = matrix[b.length][a.length];
+  const maxLen = Math.max(a.length, b.length);
+  return Math.round((1 - distance / maxLen) * 100);
+}
+
 
 
 
