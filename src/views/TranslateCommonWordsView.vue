@@ -1,28 +1,32 @@
-<template>
+<!-- This style section is the most successful and should be implemented across all exercises. -->
+<template  v-if="currentExercice" >
   <div class="exercise-container">
 
     <div class="title-container">
     <h1 ref="title" class="exercise-title">Level up</h1>
-    <h2 ref="subtitle" class="exercise-subtitle">Translate Common English words</h2>
+    <h2 ref="subtitle" class="exercise-subtitle">Translate French Words Into English</h2>
+    <h3 ref="subtitle" class="theme-exercise"> common vocabulary <img class="common-icon" src="../asset/common_icon.png" alt="Tech Icon"></h3>
     </div>
     <div class="exercise-stats">
-      <p>Latest word precision {{ currentWordScore }} %</p>
-      <p>Questions: {{ totalQuestions }}</p>
-      <p>Success: {{ successRate }}%</p>
+     <p>Question : {{ currentIndex + 1 }} / {{ totalQuestions }}</p>
+      <p>Session success: {{ successRate }}%</p>
     </div>
+
+     <p>Latest word precision {{ currentWordScore }} %</p>
 
     <div class="exercise-card-container">
       <template v-if="!finished">
         <div ref="cardRef" class="exercise-card">
           <!-- Front -->
           <div class="card-face front" v-if="!flipped">
-            <span class="exercise-level">{{ currentExercice.difficulte }}</span>
-            <p class="exercise-word" ref="wordRef">{{ currentExercice.word }}</p>
+            <span class="exercise-level">{{ currentExercice?.difficulte }}</span>
+            <p v-if="currentExercice" class="exercise-word"> {{ currentExercice.word }}</p>
             <div class="exercise-input-container">
               <input
+                id="user-answer"
                 v-model="userAnswer"
                 @keyup.enter="checkAnswer"
-                placeholder="Entrez votre traduction"
+                placeholder="Entrez votre reponse"
               />
               <button class="validation-button" @click="checkAnswer">Valider</button>
             </div>
@@ -30,20 +34,23 @@
 
           <!-- Back -->
           <div class="card-face back" v-if="flipped">
-            <div class="corection-word" v-if="showCorrection">
+            <div class="correction-word" v-if="showCorrection">
               <p class="correction-introduction">The correct answer is:</p>
               <p class="good-answare">{{ currentExercice.correction }}</p>
+              <p class="synonyms-list" v-if="currentExercice.synonymes && currentExercice.synonymes.length">
+                <strong>Synonyms:</strong> {{ currentExercice.synonymes.join(', ') }}
+              </p>
             </div>
           </div>
         </div>
       </template>
 
       <template v-else>
-        <div class="finished-message">
-          <h2>Exercice terminé ! 🎉</h2>
+        <div class="finished-message-container">
+          <h2 class="finished-message">Exercice terminé ! 🎉</h2>
           <div class="finished-buttons">
-            <button @click="restartExercise">Recommencer</button>
-            <button @click="goToSelection">Choix des exercices</button>
+            <button class="restart-button" @click="restartExercise">Recommencer</button>
+            <button class="redirect-menu-button" @click="goToSelection">Choix des exercices</button>
           </div>
         </div>
       </template>
@@ -54,20 +61,20 @@
       <h3 class="history-title">Historique</h3>
       <ul>
         <li
-          v-for="(item, index) in history"
+          v-for="(item, index) in [...history].reverse()"
           :key="index"
           :class="[
           'history-item', item.status === 'correct' ? 'correct' : item.status === 'partial' ? 'partial' :'wrong'
-]"
+      ]"
           :style="{ animationDelay: `${index * 0.1}s` }"
         >
-          <div class="history-word">{{ item.word }}</div>
+          <div class="history-word">{{ item.word }} &nbsp;&nbsp; </div>
           <div class="history-answer">
-            <span>{{ item.answer }}</span>
+            <span class="user-answer"> &nbsp;{{ item.answer }}</span>
             <span class="history-icon">
-              <template v-if="item.correct">✔️</template>
-              <template v-else-if="item.status === 'partial'"> {{ item.correctAnswer }}</template>
-              <template v-else>❌ {{ item.correctAnswer }}</template>
+              <span v-if="item.correct"></span>
+              <span v-else-if="item.status === 'partial'"> {{ item.correctAnswer }}</span>
+              <span v-else class="correct-answer"> {{ item.correctAnswer }}</span>
             </span>
           </div>
         </li>
@@ -81,38 +88,59 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import gsap from 'gsap'
 import SplitText from 'gsap/SplitText'
 import router from '@/router'
-import { watch } from 'vue'
-import { exercices_common_english } from '@/data/commonWords.js'
+import { watch } from 'vue' 
+import { exercices_common_english } from '../data/commonWords.js'
 import { pickByDifficulty , compareWithLevenshtein , getStatus, shuffle } from '../utils/ReverseTranslateExerciseEngine.js'
 import { useNextQuestion,  evaluateAnswer } from '../utils/ReverseTranslateExerciseEngine.js'
+
+
+
+
 
 
 gsap.registerPlugin(SplitText)
 
 // Exercices
-const exercices = exercices_common_english
-
+const exercices = ref([])
+const currentWordScore = ref(0)
 const currentIndex = ref(0)
 const userAnswer = ref('')
 const history = ref([])
 const finished = ref(false)
 const flipped = ref(false)
 const showCorrection = ref(false)
-const currentWordScore = ref(0)
+
 const cardRef = ref(null)
 const wordRef = ref(null)
 const animations = ['fade', 'scale', 'rotate', 'slide']
 let wordSplit = null
 let wordInterval = null
 
-const currentExercice = computed(() => exercices[currentIndex.value])
-const totalQuestions = computed(() => exercices.length)
+const currentExercice = computed(() => exercices.value[currentIndex.value] ?? null)
+const { nextQuestion } = useNextQuestion(currentIndex, finished, exercices)
+const totalQuestions = computed(() => exercices.value.length)
 const successRate = computed(() => {
   if (!history.value.length) return 0
-  return Math.round(
-    (history.value.filter(h => h.correct).length / history.value.length) * 100
-  )
+
+  const total = history.value.reduce((sum, h) => {
+    if (h.status === 'correct') return sum + 1
+    if (h.status === 'partial') return sum + 0.5
+    return sum
+  }, 0)
+
+  return Math.round((total / history.value.length) * 100)
 })
+
+
+
+// Configuration de la répartition des difficultés ( pour alimenter la fonction pickByDifficulty )
+const config = {
+  easy: 0.33,
+  medium: 0.33,
+  hard: 0.34,
+}
+
+
 
 watch(finished, value => {
   if (value) stopWordRandomAnimation()
@@ -153,6 +181,7 @@ function animateCard(type) {
 
 // Animation de résultat (vert ou rouge)
 function flashCardResult(status) {
+  
   let color = '#ef4444'  // défaut rouge
   let glow = '0 0 35px rgba(239,68,68,0.8)'
 
@@ -163,6 +192,7 @@ function flashCardResult(status) {
     color = '#fbbf24'      // jaune/orange pour partiel
     glow = '0 0 35px rgba(251,191,36,0.8)'
   }
+
   gsap.timeline()
     .to(cardRef.value, {
       backgroundColor: color,
@@ -170,14 +200,17 @@ function flashCardResult(status) {
       duration: 0.25,
       ease: 'power2.out'
     })
-    .to({}, { duration: 0.09}) // ⏱ maintien 1,5 sec
+    .to({}, { duration: 0.09 }) // maintien
     .to(cardRef.value, {
-      backgroundColor: '#1a1a1a',
+      backgroundColor: '#191c29', // ou #1a1a1a selon ton style
       boxShadow: '0 5px 15px rgba(0,0,0,0.5)',
       duration: 0.4,
       ease: 'power2.inOut'
     })
 }
+
+
+
 
 
 // Animation des lettres du mot de façon aléatoire en boucle
@@ -206,6 +239,9 @@ function resetWordAnimation() {
 
 // Animation du mot avec alternance
 function animateWord() {
+
+  
+
   const anim = animations[Math.floor(Math.random() * animations.length)]
   switch (anim) {
     case 'fade':
@@ -270,16 +306,16 @@ function animateWordLettersRandom() {
 }
 
 
-
 // Flip avec délai pour correction
 async function flipCard(delay = 100) {
+  
   flipped.value = true
   showCorrection.value = false
   await gsap.to(cardRef.value, { rotationY: 180, duration: 0.3, ease: 'power2.inOut' })
   setTimeout(() => {
     showCorrection.value = true
   }, delay)
-  await new Promise(r => setTimeout(r, delay + 1500))
+  await new Promise(r => setTimeout(r, delay + 2500))
   showCorrection.value = false
   await gsap.to(cardRef.value, { rotationY: 0, duration: 0.3, ease: 'power2.inOut' })
   flipped.value = false
@@ -290,51 +326,61 @@ async function flipCard(delay = 100) {
 
 // Vérification réponse
 async function checkAnswer() {
-  
   if (!userAnswer.value || finished.value) return
 
-  const { score, status } = evaluateAnswer({
+  // Évaluation de la réponse en incluant les synonymes
+  const { score, status, bestMatch } = evaluateAnswer({
     userResponse: userAnswer.value.trim().toLowerCase(),
-    correctWord: currentExercice.value.correction.trim().toLowerCase()
+    correctWord: currentExercice.value.correction.trim().toLowerCase(),
+    synonyms: currentExercice.value.synonymes ?? []
   })
-
-  console.log('Score:', score, 'Status:', status)
 
   currentWordScore.value = score
   flashCardResult(status)
 
+  // Historique
   history.value.push({
     word: currentExercice.value.word,
     answer: userAnswer.value,
     score,
     status,
     correct: status === 'correct',
-    correctAnswer: status === 'correct'
-      ? null
-      : currentExercice.value.correction
+    // Affiche le mot le plus proche (correction officielle ou synonyme)
+    correctAnswer: status === 'correct' ? null : bestMatch
   })
 
+  // Flip de la carte si incorrect
   if (status === 'wrong') {
     await nextTick()
     await flipCard()
   }
 
   userAnswer.value = ''
-  useNextQuestion()
+  nextQuestion()
 }
+
+
 
 
 // Recommencer
 function restartExercise() {
+  exercices.value = pickByDifficulty(
+    exercices_common_english,
+    10,
+    config
+  )
+
   currentIndex.value = 0
   history.value = []
   finished.value = false
   userAnswer.value = ''
+
   nextTick(() => {
-    animateCard(animations[currentIndex.value % animations.length])
+    animateCard(animations[0])
     animateWord()
   })
 }
+
 
 // Aller à la sélection
 function goToSelection() {
@@ -344,6 +390,7 @@ function goToSelection() {
 // Animation des titres
 const title = ref(null)
 const subtitle = ref(null)
+
 function animateTitles() {
   gsap.set(title.value, { opacity: 1, y: 0, scaleY: 1, scaleX: 1, skewX: 0 })
   gsap.set(subtitle.value, { opacity: 1, y: 0, rotation: 0 })
@@ -370,24 +417,28 @@ function animateTitles() {
 }
 
 onMounted(() => {
+  
+
+     exercices.value = pickByDifficulty(
+    exercices_common_english,
+    10,
+    config
+  )
+
+  console.log("Nombre de questions générées :", exercices.value.length)
+console.log(exercices.value)
+
   animateTitles()
   animateWordLettersRandom()
   startWordRandomAnimation()
   setInterval(animateTitles, 6500)
   animateCard(animations[currentIndex.value % animations.length])
   animateWord()
+
 })
 </script>
 
 <style scoped>
-
-.history-title {
-    font-family: 'Chewy', system-ui;
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
-    text-align: center;
-    color: #b1b6c2;
-}
 
 .correction-introduction {
     font-family: 'BBH Hegarty', cursive;
@@ -399,13 +450,13 @@ onMounted(() => {
     font-family: '"Edu NSW ACT Cursive", cursive', cursive;
 }
 
-.corection-word {
+.correction-word {
   transform: scaleX(-1);
 }
 
 .good-answare {
   font-family: 'BBH Hegarty', cursive;
-  font-size: 2.4rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
   font-weight: lighter;
   text-align: center;
   width: max-content;
@@ -428,47 +479,89 @@ onMounted(() => {
   color: #fff;
   gap: 2rem;
   position: relative;
+  
+}
+
+
+.common-icon {
+  width: 60px;
+  height: 60px;
+  vertical-align: middle;
+  margin-left: 0.5rem;
 }
 
 .exercise-title {
+  
+  margin-bottom: 0.3rem;
   font-size: clamp(4.3rem, 6vw, 4rem);
-  font-family: "Chewy", system-ui;
+  font-family: "Edu NSW ACT Cursive", cursive;
   background: linear-gradient(80deg, #438eca, #f378ed);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-align: center;
+  text-shadow:
+    -8px -3px 0 #d9d9e2,
+     -4px 4.5px 0 #bdb1c7;
 }
 
 .exercise-subtitle {
-  font-size: 1.2rem;
+  font-family: "Edu NSW ACT Cursive", cursive;
+  font-size: 1rem;
   color: #ffffff;
   text-align: center;
-  margin-bottom: 4rem;
+  margin-bottom: 0.5rem;
+   text-shadow:
+     2px 3px 0 #36113b,
+     -1.5px 4.5px 0 #bd9ddba2;
+    
 }
 
 .exercise-stats {
   display: flex;
-  justify-content: space-between;
-  width: 100%;
+  justify-content:space-around;
+  width: 98%;
+  font-size: 0.8rem;
   max-width: 400px;
   font-weight: bold;
   color: #c2c9c8;
-  padding:0 1rem;
+  
 }
 
 .exercise-card-container {
-  width: 100%;
+  width: 80vw;
   display: flex;
   justify-content: center;
   
 }
 
+
+.synonyms-list {
+
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #c2c9c8;
+}
+
+
+
+.finished-message {
+  margin: 1rem 0;
+  position: relative;
+  background-color: #191c29;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
 .exercise-card {
   margin-top: 1rem;
   position: relative;
-  background-color: #1a1a1a;
+  background-color: #191c29;
   border-radius: 1rem;
-  padding: 2rem;
+  padding: 1.5rem;
   width: 100%;
   max-width: 400px;
   text-align: center;
@@ -487,18 +580,40 @@ onMounted(() => {
   font-weight: bold;
 }
 
+.theme-exercise {
+
+  margin-bottom: 4rem;
+  font-family: "Edu NSW ACT Cursive", cursive;
+  font-size: 0.9rem;
+  color: #ffffff;
+  text-align: left;
+  margin-bottom: 2rem;
+   text-shadow:
+     2px 3px 0 #36113b,
+     -1.5px 4.5px 0 #73247ea2;
+    
+}
+
+
 
 .exercise-word {
-  font-family: "Chewy", system-ui;
-  font-size: clamp(3.5rem, 5vw, 5rem);
+  font-family: "arial black", sans-serif;
   font-weight: bold;
   margin: 3rem 0;
   text-shadow:
-     3px 5px 0 #a7b9c7,
-     4px 6px 0 #cf7281c2,
-     6px 9px 0 #89768f,
-     6px 12px 0#aecdd4,
-     8px 16px 0 #576ca3;
+     2px 5px 0 #5d4964,
+     4px 6px 0 #631463a1;
+   
+  font-size: clamp(1.8rem, 2vw, 5rem); /* min 2rem, max 5rem, s’adapte selon la largeur */
+  word-break: break-word;             /* casse les mots longs */
+}
+
+.redirect-menu-button {
+  background: linear-gradient(80deg, #2a5274, #8d45898f);
+}
+
+.restart-button {
+  background: linear-gradient(80deg, #1b4e52, #454680);
 }
 
 
@@ -534,9 +649,13 @@ onMounted(() => {
 
 /* Historique amélioré */
 .exercise-history {
-  width: 100%;
+  display:flex;
+  flex-direction: column;
+  align-items: center;
+  
   max-width: 450px;
   margin-top: 2rem;
+
 }
 
 .exercise-history h3 {
@@ -555,33 +674,45 @@ onMounted(() => {
 }
 
 .history-item {
+  width: 96vw;  /* prend toute la largeur du parent */
+  margin: 0 auto;  /* centrer si max-width est utilisé */
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
   align-items: center;
   padding: 0.6rem 1rem;
   border-radius: 0.8rem;
-  background-color: #2a2a2a;
-  color: #787a85;
-  font-size: 1.3rem;
+  background-color: #1c1c1d;
+  color: #fff;
+  font-size: 1.1rem;
   opacity: 0;
   transform: translateY(20px);
   animation: fadeInUp 0.3s forwards;
-  font-family: "Chewy", system-ui;
 }
+
 
 .history-item.correct {
-  border-left: 25px solid #4ade80;
-}
-
-.history-item.wrong {
-  border-left: 25px solid #f87171;
+  border-left: 12px solid #4dd892;
 }
 
 .history-item.partial {
-  border-left: 25px solid #fbbf24;
+  border-left: 12px solid #dd993f;
 }
 
+.history-item.wrong {
+  border-left: 12px solid #e66883;
+}
+
+.history-item:first-child {
+  font-size: clamp(1.8rem, 2vw, 2.2rem);
+  font-weight: bold;
+  background-color: #2e2e2e; /* légèrement différent pour mettre en avant */
+  box-shadow: 0 5px 15px rgba(67,142,202,0.4);
+}
+
+
 .history-word {
+  font-size: 0.9rem;
   font-weight: bold;
   flex: 1;
 }
@@ -596,6 +727,17 @@ onMounted(() => {
 
 .history-icon {
   font-weight: bold;
+}
+
+.correct-answer {
+  font-weight: bold;
+  color: #44c49d;
+}
+
+.user-answer {
+   font-size: 0.9rem;
+   font-weight: bold;
+   color: #9143af;
 }
 
 @keyframes fadeInUp {
@@ -631,7 +773,7 @@ onMounted(() => {
   padding: 0.5rem 1.2rem;
   border-radius: 1rem;
   border: none;
-  background-color: #438eca;
+  background-color: #1c4f58;
   color: #fff;
   font-weight: bold;
   cursor: pointer;
@@ -644,5 +786,20 @@ onMounted(() => {
 
 .char {
   display: inline-block;
+}
+
+.history-title {
+  font-family: "Edu NSW ACT Cursive", cursive;
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(80deg, #8598a8, #ffe1fe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+}
+
+.history-answer-texte{
+  text-align: center;
 }
 </style>

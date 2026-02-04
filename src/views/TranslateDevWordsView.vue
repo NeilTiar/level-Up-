@@ -67,11 +67,11 @@
         >
           <div class="history-word">{{ item.word }} &nbsp;&nbsp; </div>
           <div class="history-answer">
-            <span class> &nbsp;{{ item.answer }}</span>
+            <span class="user-answer"> &nbsp;{{ item.answer }}</span>
             <span class="history-icon">
-              <template v-if="item.correct"></template>
-              <template v-else-if="item.status === 'partial'"> {{ item.correctAnswer }}</template>
-              <template v-else> {{ item.correctAnswer }}</template>
+              <span v-if="item.correct"></span>
+              <span v-else-if="item.status === 'partial'"> {{ item.correctAnswer }}</span>
+              <span v-else class="correct-answer"> {{ item.correctAnswer }}</span>
             </span>
           </div>
         </li>
@@ -486,6 +486,7 @@ console.log(exercices.value)
 }
 
 .exercise-title {
+  
   margin-bottom: 0.3rem;
   font-size: clamp(4.3rem, 6vw, 4rem);
   font-family: "Edu NSW ACT Cursive", cursive;
@@ -575,7 +576,7 @@ console.log(exercices.value)
   margin-bottom: 2rem;
    text-shadow:
      2px 3px 0 #36113b,
-     -1.5px 4.5px 0 #bd9ddba2;
+     -1.5px 4.5px 0 #73247ea2;
     
 }
 
@@ -659,7 +660,9 @@ console.log(exercices.value)
 }
 
 .history-item {
+  
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
   align-items: center;
   padding: 0.6rem 1rem;
@@ -670,20 +673,18 @@ console.log(exercices.value)
   opacity: 0;
   transform: translateY(20px);
   animation: fadeInUp 0.3s forwards;
-  min-width: 85%;
-  
 }
 
 .history-item.correct {
-  border-left: 20px solid #4dd892;
+  border-left: 12px solid #4dd892;
 }
 
 .history-item.partial {
-  border-left: 20px solid #dd993f;
+  border-left: 12px solid #dd993f;
 }
 
 .history-item.wrong {
-  border-left: 20px solid #e66883;
+  border-left: 12px solid #e66883;
 }
 
 .history-item:first-child {
@@ -710,6 +711,17 @@ console.log(exercices.value)
 
 .history-icon {
   font-weight: bold;
+}
+
+.correct-answer {
+  font-weight: bold;
+  color: #44c49d;
+}
+
+.user-answer {
+   font-size: 0.9rem;
+   font-weight: bold;
+   color: #9143af;
 }
 
 @keyframes fadeInUp {
