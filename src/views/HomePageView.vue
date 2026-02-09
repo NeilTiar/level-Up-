@@ -22,7 +22,7 @@ function animateTitles() {
     scaleY: 1.9,
     scaleX: 0.8,
     skewX: 5,
-    duration: 1.8,
+    duration: 2.6,
     ease: "elastic.out(5, 1.2)"
   });
 
@@ -39,6 +39,32 @@ function animateTitles() {
 }
 
 
+function buttonAnimation(event, route = null) {
+  const btn = event.currentTarget; // le bouton cliqué uniquement
+
+  const tl = gsap.timeline();
+
+  tl.to(btn, {
+    scale: 2.70,
+    filter: "brightness(1.9) drop-shadow(0 0 32px rgba(255,255,255,0.45))",
+    duration: 0.05,
+    ease: "power2.out"
+  })
+  .to(btn, {
+    scale: 1,
+    filter: "brightness(1)",
+    boxShadow: "0 0 0 #312435",
+    duration: 0.15,
+    ease: "power3.out"
+  });
+
+    // Navigation après délai (0.8s)
+    if (route) {
+    setTimeout(() => {
+      router.push(route);
+    }, 300);
+  }
+}
 
 
 onMounted(() => {
@@ -47,7 +73,7 @@ onMounted(() => {
   // Relance toutes les 3 secondes
   setInterval(() => {
     animateTitles();
-  }, 4500);
+  }, 8500);
 
 
 })
@@ -62,13 +88,21 @@ onMounted(() => {
    
     <div class="home-container__title-container">
       <h1 ref="title" class="home-container__level-up-title">level up</h1>
-       <h2 ref="subtitle" class="home-container__english-subtitle">English training App</h2>
+       <h2 ref="subtitle" class="home-container__english-subtitle">L'aplication pour developer <br> ton anglais</h2>
       <h2 class="home-container__V1-subtitle">V1</h2>
     </div>
 
  
 
-    <button @click="() => {router.push('/select-exercises')}" class="home-container__button-exercises">Exercices</button>
+    <button   class="home-container__button-exercises" @click="buttonAnimation($event, '/translate-common')">
+      <img class="button-icon" src="../asset/Icons/icon-revision.png" alt="" />
+    Revisions  Definitions</button>
+    <button class="home-container__button-exercises" @click="buttonAnimation($event, '/translate-common')" >
+      <img class="button-icon" src="../asset/Icons/icon-trad-invers.png" alt="" />
+    Traduction inversé</button>
+    <button class="home-container__button-exercises"  @click="buttonAnimation($event, '/grammar')">
+       <img class="button-icon" src="../asset/Icons/icon-gram.png" alt="" />
+    Grammaire</button>
 
        <div class="container-author">
       <p class="container-author__name">By Neil T.</p>
@@ -83,7 +117,7 @@ onMounted(() => {
 .home-container {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+ 
   align-items: center;
   height: 100vh;
   gap: 40px;
@@ -97,7 +131,7 @@ onMounted(() => {
   justify-content: center;
   align-items: center;
   text-align: center;
-  font-family: "Edu NSW ACT Cursive", cursive;
+
   font-size: clamp(1.5rem, 5vw, 3rem);
   line-height: 1.2;
 }
@@ -107,12 +141,20 @@ onMounted(() => {
   font-family: 'BBH Hegarty', cursive;
   font-size: 1.8rem;
   color: #c2c9c8;
-  margin-bottom: 2rem;
+  margin: 2rem 0;
+}
+
+.button-icon {
+  filter: brightness(0) invert(1);
+  width: 92px;
+  height: 92px;
+  flex-shrink: 0;
+  color:#fff
 }
 
 /* Level up */
 .home-container__level-up-title {
-  
+    font-family: 'arial black', sans-serif;
   font-size: 5.5rem;
   font-weight: bold;
   margin-bottom: 2rem;
@@ -141,18 +183,24 @@ onMounted(() => {
 
 
 /* Bouton exercices */
+
 .home-container__button-exercises {
-  padding: 0.5rem 1rem;
+
+  display: flex;           /* active Flexbox */
+  align-items: center;     /* centre verticalement texte + icône */
+  justify-content: flex-start; /* texte à droite de l'icône */
+  padding: 0.5rem 1.5rem;
   font-size: 1.5rem;
-  background: linear-gradient(90deg, #332d58, #264d96);
-  color: #ffffff;
+  background:  linear-gradient(135deg, #4a91e2b6, #bb13fe);
+  color: #dbd8dd;
   border: none;
   border-radius: 25px;
   cursor: pointer;
   transition: background 0.3s ease, transform 0.3s ease;
-  margin-top: 3rem;
-  font-weight: bold;
-  font-family: "Edu NSW ACT Cursive", cursive;
+  margin-top: 1.5rem;
+  font-weight: lighter;
+  will-change: transform, filter;
+  
 }
 
 .home-container__button-exercises:hover {
